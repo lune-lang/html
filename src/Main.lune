@@ -1,0 +1,78 @@
+export main
+
+import Prelude open
+import String exposing type string
+import List exposing (:), empty
+import IO exposing type io
+import Program exposing type program
+
+import Spa
+import Spa_Element as Elem exposing type element
+import Spa_Property as Prop
+
+type state =
+  { Input := string
+  ; Message := string
+  ; Modulo := int
+  ; nil }
+
+val main :: io unit
+let main = Spa.document init
+  ( Start := Spa.setTitle "numberwang"
+  ; View := view
+  ; unit )
+
+val init :: state
+let init =
+  ( Input := ""
+  ; Message := ""
+  ; Modulo := 2
+  ; unit )
+
+val view :: state -> element state
+let view state =
+  Elem.node "div" empty
+    ( inputField
+    : submitButton
+    : paragraph (Message ? state)
+    : empty )
+
+val inputField :: element state
+let inputField =
+  Elem.node "input"
+    ( Prop.onInput inputEdit
+    : Prop.attribute "placeholder" "type numbers here"
+    : empty )
+    empty
+
+val submitButton :: element state
+let submitButton =
+  Elem.node "button"
+    (Prop.onClick changeMessage : empty)
+    (Elem.text "submit" : empty)
+
+val paragraph :: string -> element state
+let paragraph str =
+  Elem.node "p" empty
+    (Elem.text str : empty)
+
+val inputEdit :: string -> program state unit
+let inputEdit input = Program.modify (Input != input)
+
+val changeMessage :: program state unit
+let changeMessage =
+  Program.modify do state. def
+    let input = Input ? state
+    let modulo = Modulo ? state
+    in ( Message != message modulo input
+       ; Modulo != if (modulo >= 8) { 2 } { modulo + 1 }
+       ; state )
+
+val message :: int -> string -> string
+let message modulo input =
+  String.toFloat input
+  # match Just (floor >> do num.
+      if (mod modulo num == 0)
+      { "that's numberwang!" }
+      { "that isn't numberwang" })
+  $ else "that isn't a number"

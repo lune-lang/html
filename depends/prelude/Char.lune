@@ -1,0 +1,98 @@
+export
+  type char,
+  isLetter, isLower, isUpper,
+  isLatin, isEnglish,
+  isDigit, isHexDigit, isSpace,
+  toLower, toUpper,
+  fromCode, toCode
+
+import Prelude open
+
+type char :: Type
+syntax char char-type
+{-
+The type of unicode characters, such as `'a'`, `'?'`, or `'\xE1'`.
+Character literals are written with single quotes.
+-}
+
+{- ## Predicates -}
+
+foreign isLetter :: char -> bool
+{-
+Detect characters in the general category L (letter).
+```
+isLetter 'A' --> true
+isLetter 'ル' --> true
+isLetter '3' --> false
+```
+-}
+
+foreign isLower :: char -> bool
+{-
+Detect characters in the general subcategory Ll (lowercase letter).
+```
+isLower 'g' --> true
+isLower 'ζ' --> true
+isLower 'G' --> false
+isLower 'ㅈ' --> false
+```
+-}
+
+foreign isUpper :: char -> bool
+{-
+Detect characters in the general subcategory Lu (uppercase letter).
+-}
+
+foreign isLatin :: char -> bool
+{-
+Detect letters in the extended latin alphabet.
+```
+isLatin 'q' --> true
+isLatin 'ß' --> true
+isLatin 'λ' --> false
+```
+-}
+
+foreign isEnglish :: char -> bool
+{-
+Detect English letters: a-z and A-Z.
+-}
+
+foreign isDigit :: char -> bool
+{-
+Detect decimal digits: 0-9.
+-}
+
+foreign isHexDigit :: char -> bool
+{-
+Detect hexidecimal digits: 0-9, a-f, and A-F.
+-}
+
+foreign isSpace :: char -> bool
+{-
+Detect whitespace characters, such as space, tab, newline, and so on.
+-}
+
+{- ## Case conversions -}
+
+foreign toLower, toUpper :: char -> char
+{-
+Change the case of a character.
+```
+toLower 'S' --> 's'
+toLower 'Σ' --> 'σ'
+toLower '#' --> '#'
+```
+-}
+
+{- ## Unicode conversions -}
+
+foreign fromCode :: int -> char
+{-
+Convert a code point into a unicode character.
+-}
+
+foreign toCode :: char -> int
+{-
+Get the code point of a unicode character.
+-}

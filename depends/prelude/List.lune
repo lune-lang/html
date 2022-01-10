@@ -1,0 +1,514 @@
+export
+  type list, makeList, getList,
+  empty, e, (:), deconstruct, single,
+  isEmpty, length,
+  head, tail, take, drop, get,
+  (++), concat, concatMap, repeat, reverse, range,
+  contains, find,
+  map, mapIndex, mapResult, separate,
+  filter, partition, count, some, all,
+  foldLeft, foldRight, sum, product,
+  sort, sortBy, sortWith,
+  apply, map2, map3, map4,
+  zipApply, zip2, zip3, zip4
+
+import Prelude open
+import Result exposing type result, type maybe, nothing
+
+infix : right 20
+infix ++ right 60
+
+type list :: Type -> Type
+  where list a =
+    [ Empty := unit
+    ; Cons := { Head := a; Tail := list a; nil }
+    ; nil ]
+  with makeList, getList
+{-
+The homogenous linked list is Lune's main array-like data structure.
+`list a` represents a list with elements of type `a`. You can use the
+`makeList` and `getList` functions to convert between lists and
+normal records/variants, but this is rarely necessary.
+-}
+
+{- ## Basic operations -}
+
+val empty :: any a. list a
+let empty = makeList (only Empty)
+{-
+The empty list.
+-}
+
+expand e = empty
+{-
+An abbreviation for avoiding clutter.
+-}
+
+val (:) :: any a. a -> list a -> list a
+let (:) x xs = makeList $ Cons ^ (Head := x; Tail := xs; unit)
+{-
+The "cons" operator. Attach a value to the start of a list.
+-}
+
+val deconstruct :: any a b. b -> (a -> list a -> b) -> list a -> b
+let deconstruct x f xs = getList xs # match Cons (do r. f (Head ? r) (Tail ? r)) $ else x
+{-
+`deconstruct x f list` represents the following process:
+* If the list is empty, return `x`.
+* Otherwise, apply `f` to the head and tail of the list.
+
+`deconstruct` is the most general list operation. If none of the
+other functions in this module suits your purpose, use `deconstruct`.
+-}
+
+val single :: any a. a -> list a
+let single x = x : empty
+{-
+Make a list with a single element.
+-}
+
+val isEmpty :: any a. list a -> bool
+let isEmpty = deconstruct false do x xs. true
+{-
+Test if a list is empty.
+-}
+
+val length :: any a. list a -> int
+let length = deconstruct 0 do x xs. 1 + length xs
+{-
+Get the length of a list.
+-}
+
+{- ## Slicing -}
+
+val head :: any a. list a -> maybe a
+let head = deconstruct nothing do x xs. Just ^ x
+{-
+Get the first element of a list.
+```
+head empty          --> nothing
+head (1 : 3 : 6 :e) --> Just ^ 1
+```
+-}
+
+val tail :: any a. list a -> maybe (list a)
+let tail = deconstruct nothing do x xs. Just ^ xs
+{-
+Remove the first element of a list.
+```
+tail empty          --> nothing
+tail (1 : 3 : 6 :e) --> Just ^ (3 : 6 :e)
+```
+-}
+
+val take :: any a. int -> list a -> list a
+let take n xs =
+  if (n <= 0) { empty }
+  { deconstruct empty (do x xt. x : take (n ~ 1) xt) xs }
+{-
+Take the given number of elements from the start of a list.
+```
+take 3 (1 : 1 : 2 : 3 : 5 :e) --> 1 : 1 : 2 :e
+```
+-}
+
+val drop :: any a. int -> list a -> list a
+let drop n xs =
+  if (n <= 0) { xs }
+  { deconstruct empty (do x xt. drop (n ~ 1) xt) xs }
+{-
+Remove the given number of elements from the start of a list.
+```
+drop 2 ('x' : 'y' : 'z' :e) --> 'z' :e
+```
+-}
+
+val get :: any a. int -> list a -> maybe a
+let get n =
+  deconstruct nothing do x xs.
+    if (n < 0) { nothing }
+    $ else $ if (n == 0) { Just ^ x }
+    $ else $ get (n ~ 1) xs
+{-
+Get the element at the given index. Return `nothing` if the index
+is out of range.
+```
+get 2 (6 : 5 : 4 : 3 :e) --> 4
+```
+-}
+
+{- ## Building lists -}
+
+val (++) :: any a. list a -> list a -> list a
+let (++) xs ys = xs # deconstruct ys do x xt. x : xt ++ ys
+{-
+Concatenate two lists.
+```
+(1 : 2 : 3 :e) ++ (4 : 5 : 6 :e)
+  --> 1 : 2 : 3 : 4 : 5 : 6 :e
+```
+-}
+
+val concat :: any a. list (list a) -> list a
+let concat = foldRight (++) empty
+{-
+Concatenate a list of lists.
+```
+concat ((1 : 2 :e) : (3 : 4 :e) : (5 : 6 :e) :e)
+  --> 1 : 2 : 3 : 4 : 5 : 6 :e
+```
+-}
+
+val concatMap :: any a b. (a -> list b) -> list a -> list b
+let concatMap f xs = concat (map f xs)
+{-
+Apply a function to each element of a list, and concatenate the results.
+-}
+
+val repeat :: any a. int -> a -> list a
+let repeat n x =
+  if (n <= 0) { empty }
+  { x : repeat (n ~ 1) x }
+{-
+Repeat an element the given number of times.
+```
+repeat 4 "ok" --> "ok" : "ok" : "ok" : "ok" :e
+```
+-}
+
+val reverse :: any a. list a -> list a
+let reverse = deconstruct empty do x xs. reverse xs ++ single x
+{-
+Reverse a list.
+-}
+
+val range :: int -> int -> list int
+let range m n =
+  if (n <= m) { empty }
+  { m : range (m + 1) n }
+{-
+Create a range of consecutive integers, given a starting value
+(inclusive), and an ending value (exclusive).
+```
+range 4 9 --> 4 : 5 : 6 : 7 : 8 :e
+```
+-}
+
+{- ## Lookup operations -}
+
+val contains :: any a. a -> list a -> bool
+let contains x = some (== x)
+{-
+Test if a list contains the given element.
+```
+contains 6 (range 5 10) --> true
+contains 3 (range 5 10) --> false
+```
+-}
+
+val find :: any a. a -> list a -> list int
+let find = findN 0
+{-
+Find every index where the given element occurs.
+```
+find 0 (0 : 1 : 4 : 0 : 2 :e) --> 0 : 3 :e
+```
+-}
+
+val findN :: any a. int -> a -> list a -> list int
+let findN n x =
+  deconstruct empty do y ys. def
+    let indexes = findN (n + 1) x ys
+    in if (x == y) { n : indexes } $ else indexes
+
+{- ## Mapping -}
+
+val map :: any a b. (a -> b) -> list a -> list b
+let map f = deconstruct empty do x xs. f x : map f xs
+{-
+Apply a function to each element in a list.
+```
+map (+ 10) (0 : 2 : 1 :e) --> 10 : 12 : 11 :e
+```
+-}
+
+val mapIndex :: any a b. (int -> a -> b) -> list a -> list b
+let mapIndex = mapIndexN 0
+{-
+Apply a function to each index-element pair in a list.
+-}
+
+val mapIndexN :: any a b. int -> (int -> a -> b) -> list a -> list b
+let mapIndexN n f =
+  deconstruct empty do x xs.
+    f n x : mapIndexN (n + 1) f xs
+
+val mapResult :: any e a b. (a -> result e b) -> list a -> list b
+let mapResult f = def
+  let add x xs = f x # match Just (: xs) $ else xs
+  in foldRight add empty
+{-
+Apply a function to each element in a list,
+and collect the successful results.
+```
+mapResult String.toInt ("12" : "abc" : "3" :e) --> 12 : 3 :e
+```
+-}
+
+val separate :: any a b. list (a & b) -> list a & list b
+let separate = def
+  let add x xs =
+    First #= ((First ? x) :)
+    ; Second #= ((Second ? x) :)
+    ; xs
+  in foldRight add (empty & empty)
+{-
+Separate a list of pairs into a pair of lists.
+-}
+
+{- ## Filtering -}
+
+val filter :: any a. (a -> bool) -> list a -> list a
+let filter f = def
+  let add x xs = if (f x) { x : xs } { xs }
+  in foldRight add empty
+{-
+Keep only the elements of a list that pass the given predicate.
+```
+filter (> 0) (-2 : 5 : 3 : -3 :e) --> 5 : 3 :e
+```
+-}
+
+val partition
+  :: any a
+   . (a -> bool)
+  -> list a
+  -> { Pass := list a
+     ; Fail := list a
+     ; nil }
+let partition f = def
+  let add x xs = if (f x) { Pass #= (x :); xs } { Fail #= (x :); xs }
+  in foldRight add (Pass := empty; Fail := empty; unit)
+{-
+Partition the elements of a list based on whether they pass
+the given predicate.
+```
+partition (> 0) (-2 : 5 : 3 : -3 :e)
+  --> Pass := (5 : 3 :e)
+    ; Fail := (-2 : -3 :e)
+    ; unit
+```
+-}
+
+val count :: any a. (a -> bool) -> list a -> int
+let count f = def
+  let add x n = if (f x) { n + 1 } { n }
+  in foldRight add 0
+{-
+Find the number of elements in a list that pass the given predicate.
+```
+count (> 0) (-2 : 5 : 3 : -3 :e) --> 2
+```
+-}
+
+val some :: any a. (a -> bool) -> list a -> bool
+let some f =
+  deconstruct false do x xs.
+    if (f x) { true } { some f xs }
+{-
+Test if at least one of the elements passes the given predicate.
+```
+some (> 0) empty       --> false
+some (> 0) (-1 :e)     --> false
+some (> 0) (-1 : 1 :e) --> true
+some (> 0) (1 :e)      --> true
+```
+-}
+
+val all :: any a. (a -> bool) -> list a -> bool
+let all f =
+  deconstruct true do x xs.
+    if (not $ f x) { false } { all f xs }
+{-
+Test if all of the elements pass the given predicate.
+```
+all (> 0) empty       --> true
+all (> 0) (-1 :e)     --> false
+all (> 0) (-1 : 1 :e) --> false
+all (> 0) (1 :e)      --> true
+```
+-}
+
+{- ## Folds -}
+
+val foldLeft :: any a b. (a -> b -> b) -> b -> list a -> b
+let foldLeft f n =
+  deconstruct n do x xs.
+    foldLeft f (f x n) xs
+{-
+Fold a function over a list, starting with the first element.
+`foldLeft f x (0 : 1 : 2 :e)` is equivalent to
+`x # f 0 # f 1 # f 2`.
+-}
+
+val foldRight :: any a b. (a -> b -> b) -> b -> list a -> b
+let foldRight f n =
+  deconstruct n do x xs.
+    f x (foldRight f n xs)
+{-
+Fold a function over a list, starting with the last element.
+`foldRight f x (0 : 1 : 2 :e)` is equivalent to
+`f 0 $ f 1 $ f 2 $ x`
+-}
+
+val sum :: any x. list (num x) -> num x
+let sum = foldRight (+) 0
+{-
+Find the sum of a list of numbers.
+-}
+
+val product :: any x. list (num x) -> num x
+let product = foldRight (*) 1
+{-
+Find the product of a list of numbers.
+-}
+
+{- ## Sorting -}
+
+val sort :: any a. list a -> list a
+let sort = sortBy identity
+{-
+Sort a list.
+-}
+
+val sortBy :: any a b. (a -> b) -> list a -> list a
+let sortBy f =
+  deconstruct empty do x xs. def
+    let half = partition (do y. f y < f x) xs
+    in sortBy f (Pass ? half) ++ single x ++ sortBy f (Fail ? half)
+{-
+Sort a list, but apply the given function to each
+element before comparing them.
+```
+sortBy String.length ("hello" : "hi" : "hey" :e)
+  --> "hi" : "hey" : "hello" :e
+```
+-}
+
+val sortWith :: any a. (a -> a -> order) -> list a -> list a
+let sortWith f =
+  deconstruct empty do x xs. def
+    let half = partition (do y. f y x == only Less) xs
+    in sortWith f (Pass ? half) ++ single x ++ sortWith f (Fail ? half)
+{-
+Sort a list with a custom comparison function.
+-}
+
+{- ## Nondeterministic application -}
+
+val apply :: any a b. list (a -> b) -> list a -> list b
+let apply fs xs = fs # deconstruct empty do f ft. map f xs ++ apply ft xs
+{-
+`apply fs xs` applies every function in `fs` to every value in `xs`,
+and collects the results.
+-}
+
+val map2
+  :: any a1 a2 a3
+   . (a1 -> a2 -> a3)
+  -> list a1
+  -> list a2
+  -> list a3
+let map2 f xs = apply (map f xs)
+{-
+Map a binary function over two lists by applying it
+to every combination of arguments.
+```
+map2 (+) (1.2 : 2.4 :e) (0 : 10 : 20 :e)
+  --> 1.2 : 2.4 : 11.2 : 12.4 : 21.2 : 22.4 :e
+```
+-}
+
+val map3
+  :: any a1 a2 a3 a4
+   . (a1 -> a2 -> a3 -> a4)
+  -> list a1
+  -> list a2
+  -> list a3
+  -> list a4
+let map3 f xs1 xs2 = apply (map2 f xs1 xs2)
+
+{-
+Map a three-argument function over three lists by applying it
+to every combination of arguments.
+-}
+
+val map4
+  :: any a1 a2 a3 a4 a5
+   . (a1 -> a2 -> a3 -> a4 -> a5)
+  -> list a1
+  -> list a2
+  -> list a3
+  -> list a4
+  -> list a5
+let map4 f xs1 xs2 xs3 = apply (map3 f xs1 xs2 xs3)
+
+{-
+Map a four-argument function over four lists by applying it
+to every combination of arguments.
+-}
+
+{- ## Elementwise application -}
+
+val zipApply :: any a b. list (a -> b) -> list a -> list b
+let zipApply fs xs =
+  fs # deconstruct empty do f ft.
+    xs # deconstruct empty do x xt.
+      f x : zipApply ft xt
+{-
+`zipApply fs xs` applies every function in `fs` to the corresponding
+value in `xs`, and collects the results.
+-}
+
+val zip2
+  :: any a1 a2 a3
+   . (a1 -> a2 -> a3)
+  -> list a1
+  -> list a2
+  -> list a3
+let zip2 f xs = zipApply (map f xs)
+{-
+Map a binary function over two lists by applying it
+to pairs of corresponding elements.
+```
+zip2 (+) (1.2 : 2.4 :e) (0 : 10 : 20 :e)
+  --> 1.2 : 12.4 :e
+```
+-}
+
+val zip3
+  :: any a1 a2 a3 a4
+   . (a1 -> a2 -> a3 -> a4)
+  -> list a1
+  -> list a2
+  -> list a3
+  -> list a4
+let zip3 f xs1 xs2 = zipApply (zip2 f xs1 xs2)
+{-
+Map a three-argument function over three lists by applying it
+to triples of corresponding elements.
+-}
+
+val zip4
+  :: any a1 a2 a3 a4 a5
+   . (a1 -> a2 -> a3 -> a4 -> a5)
+  -> list a1
+  -> list a2
+  -> list a3
+  -> list a4
+  -> list a5
+let zip4 f xs1 xs2 xs3 = zipApply (zip3 f xs1 xs2 xs3)
+{-
+Map a four-argument function over four lists by applying it
+to quadruples of corresponding elements.
+-}

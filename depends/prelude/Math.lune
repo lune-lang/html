@@ -1,0 +1,156 @@
+export
+  square, cube, sqrt, cbrt,
+  exp, (**), log, logBase,
+  pi, tau,
+  type angle, radians, degrees, turns,
+  sin, cos, tan, asin, acos, atan, atan2,
+  sinh, cosh, tanh, asinh, acosh, atanh,
+  hypot, distance
+
+import Prelude open
+
+infix ** right 70
+
+{- ## Exponents and logarithms -}
+
+val square, cube :: any x. num x -> num x
+let square x = x * x
+let cube x = x * x * x
+{-
+Square or cube a number.
+-}
+
+foreign sqrt, cbrt :: float -> float
+{-
+Take the square root or cube root of a float.
+-}
+
+foreign exp :: float -> float
+{-
+Natural exponentiation.
+```
+exp 0       --> 1
+exp 1       --> 2.718281828459045
+exp (log 5) --> 5
+```
+-}
+
+foreign (**) :: float -> float -> float
+{-
+Exponentiation with any base. `x ** y` means "x to the power of y".
+-}
+
+foreign log :: float -> float
+{-
+Natural logarithm.
+```
+log 1                 --> 0
+log 2.718281828459045 --> 1
+log (exp 5)           --> 5
+```
+-}
+
+val logBase :: float -> float -> float
+let logBase x y = log y / log x
+{-
+Logarithm with any base.
+```
+logBase 2 16 --> 4
+```
+-}
+
+{- ## Circle constants -}
+
+foreign pi :: float
+{-
+The area of the unit circle.
+```
+pi = 3.141592653589793
+```
+-}
+
+val tau :: float
+let tau = pi * 2
+{-
+The circumference of the unit circle.
+`tau` is usually more intuitive than `pi` when working with radians.
+```
+tau = 6.283185307179586
+```
+-}
+
+{- ## Angles -}
+
+type angle = float
+
+val radians :: float -> angle
+let radians x = x
+{-
+Define an angle in radians. Angles are measured in radians by default,
+but the `radians` function can make code clearer.
+```
+radians (tau / 4) = 1.5707963267948966
+```
+-}
+
+val degrees :: float -> angle
+let degrees x = x * tau / 360
+{-
+Define an angle in degrees.
+```
+degrees 90 = 1.5707963267948966
+```
+-}
+
+val turns :: float -> angle
+let turns x = x * tau
+{-
+Define an angle in turns. (1 turn = tau radians = 360 degrees)
+```
+turns (1 / 4) = 1.5707963267948966
+```
+-}
+
+{- ## Trigonometry -}
+
+foreign sin, cos, tan :: angle -> float
+{-
+Basic trig functions: sine, cosine, and tangent.
+-}
+
+foreign asin, acos, atan :: float -> angle
+{-
+Inverse trig functions.
+-}
+
+foreign atan2 :: float -> float -> angle
+{-
+`atan2 y x` is equivalent to `atan (y / x)`.
+You can use this to calculate the angle from the positive x-axis
+to the point (x, y).
+-}
+
+foreign sinh, cosh, tanh :: angle -> float
+{-
+Hyperbolic trig functions.
+-}
+
+foreign asinh, acosh, atanh :: float -> angle
+{-
+Inverse hyperbolic trig functions.
+-}
+
+{- ## Distance functions -}
+
+foreign hypot :: float -> float -> float
+{-
+`hypot x y` is the hypoteneuse of a right triangle with
+leg lengths `x` and `y`. It is also the distance from the origin
+to the point (x, y).
+-}
+
+val distance :: float -> float -> float -> float -> float
+let distance x1 y1 x2 y2 = hypot (x2 ~ x1) (y2 ~ y1)
+{-
+Calculate the distance between two points on a plane.
+-}

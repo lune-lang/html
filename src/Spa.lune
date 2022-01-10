@@ -1,0 +1,50 @@
+export type route, document, application, setTitle
+
+import Prelude open
+import String exposing type string
+import List exposing type list
+import IO exposing type io
+import Program exposing type program
+
+import Spa_Element exposing type element
+
+type route st =
+  { Url := string
+  ; Start := program st unit
+  ; View := st -> element st
+  ; nil }
+
+val document
+  :: any st. st
+  -> { Start := program st unit
+     ; View := st -> element st
+     ; nil }
+  -> io unit
+let document init route =
+  application init "/" $ List.single (Url := "/"; route)
+
+foreign application
+  :: any st. st
+  -> string
+  -> list (route st)
+  -> io unit
+refers Spa.addRoutes
+
+foreign addComponent
+  :: any st a
+   . string
+  -> program st unit
+  -> (st -> element st)
+  -> a -> a
+
+val addRoute :: any st a. route st -> a -> a
+let addRoute route =
+  addComponent (Url ? route) (Start ? route) (View ? route)
+
+val addRoutes :: any st a. list (route st) -> a -> a
+let addRoutes = List.map addRoute >> List.foldRight (>>) identity
+
+foreign setTitleIO :: string -> io unit
+
+val setTitle :: any st. string -> program st unit
+let setTitle = Program.fromIO << setTitleIO

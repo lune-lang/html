@@ -1,0 +1,418 @@
+export
+  type string, isEmpty, length,
+  (<>), concat, concatMap, join, joinMap,
+  repeat, reverse,
+  split, words, lines,
+  slice, takeLeft, takeRight, dropLeft, dropRight,
+  toLower, toUpper,
+  padLeft, padRight, trim, trimLeft, trimRight,
+  contains, startsWith, endsWith,
+  find, replace,
+  toInt, fromInt, toFloat, fromFloat,
+  toList, fromList,
+  cons, deconstruct,
+  single, head, tail, get,
+  map, mapIndex,
+  filter, partition, count, some, all,
+  foldLeft, foldRight
+
+import Prelude open
+import Char exposing type char
+import List exposing type list
+import Result exposing type maybe, nothing
+
+infix <> left 65
+
+type string :: Type
+syntax string string-type
+{-
+The type of strings. String literals are written with double quotes.
+Unlike in Haskell, strings are not lists of characters; they are
+actually strings.
+-}
+
+{- ## Basic properties -}
+
+val isEmpty :: string -> bool
+let isEmpty str = str == ""
+{-
+Test if a string is empty.
+-}
+
+foreign length :: string -> int
+{-
+Get the length of a string.
+-}
+
+{- ## Building strings -}
+
+foreign (<>) :: string -> string -> string
+{-
+Concatenate two strings.
+```
+"for" <> " " <> "example" --> "for example"
+```
+-}
+
+val concat :: list string -> string
+let concat = List.foldRight (<>) ""
+{-
+Concatenate a list of strings.
+```
+concat ("for" : " " : "example" :e) --> "for example"
+```
+-}
+
+val concatMap :: any a. (a -> string) -> list a -> string
+let concatMap f xs = concat (List.map f xs)
+{-
+Apply a function to each element of a list, and concatenate the results.
+-}
+
+val join :: string -> list string -> string
+let join sep = def
+  let append str1 str2 =
+    if (isEmpty str2) { str1 }
+    { str1 <> sep <> str2 }
+  in List.foldRight append ""
+{-
+Join a list of strings with the given separator.
+```
+join ", " ("1" : "2" : "3" :e) --> "1, 2, 3"
+```
+-}
+
+val joinMap :: any a. string -> (a -> string) -> list a -> string
+let joinMap sep f xs = join sep (List.map f xs)
+{-
+Apply a function to each element of a list,
+and join the results with the given separator.
+-}
+
+val repeat :: int -> string -> string
+let repeat n str = if (n <= 0) { "" } { str <> repeat (n ~ 1) str }
+{-
+Repeat a substring the given number of times.
+```
+repeat 3 "abc" --> "abcabcabc"
+```
+-}
+
+foreign reverse :: string -> string
+{-
+Reverse a string.
+-}
+
+{- ## Splitting and slicing -}
+
+foreign split :: string -> string -> list string
+{-
+Split a string into a list using the given separator.
+```
+split "," "56,1,7" --> "56" : "1" : "7" :e
+```
+-}
+
+foreign words, lines :: string -> list string
+{-
+Split a string into a list of words or lines.
+```
+words "a \nweird string" --> "a" : "weird" : "string" :e
+lines "a \nweird string" --> "a " : "weird string" :e
+```
+-}
+
+foreign slice :: int -> int -> string -> string
+{-
+Get a substring from a string, given a start index (inclusive) and
+an end index (exclusive). Negative indices "wrap around" to the end of the string.
+```
+slice 0 6 "Wissenschaft"  --> "Wissen"
+slice 6 -3 "Wissenschaft" --> "sch"
+```
+-}
+
+val takeLeft, takeRight :: int -> string -> string
+let takeLeft x str = if (x <= 0) { "" } { slice 0 x str }
+let takeRight x str = if (x <= 0) { "" } { slice -x (length str) str }
+{-
+Take the given number of characters from the edge of a string.
+```
+takeLeft 3 "January"  --> "Jan"
+takeRight 4 "January" --> "uary"
+```
+-}
+
+val dropLeft, dropRight :: int -> string -> string
+let dropLeft x str = if (x <= 0) { str } { slice x (length str) str }
+let dropRight x str = if (x <= 0) { str } { slice 0 -x str }
+{-
+Remove the given number of characters from the edge of a string.
+```
+dropLeft 2 "ahoy!"  --> "oy!"
+dropRight 2 "ahoy!" --> "aho"
+```
+-}
+
+{- ## Formatting -}
+
+foreign toLower :: string -> string
+{-
+Convert all the letters in a string to lowercase.
+-}
+
+foreign toUpper :: string -> string
+{-
+Convert all the letters in a string to uppercase.
+-}
+
+val padLeft, padRight :: int -> string -> string
+let padLeft x str = if (length str >= x) { str } { " " <> padLeft (x ~ 1) str }
+let padRight x str = if (length str >= x) { str } { padRight (x ~ 1) str <> " " }
+{-
+Pad a string with spaces till it reaches the given length.
+```
+padLeft 5 "xyz"  --> "  xyz"
+padRight 5 "xyz" --> "xyz  "
+```
+-}
+
+foreign trim, trimLeft, trimRight :: string -> string
+{-
+Trim whitespace from the edge of a string.
+```
+trim " X "      --> "X"
+trimLeft " X "  --> "X "
+trimRight " X " --> " X"
+```
+-}
+
+{- ## Substring operations -}
+
+foreign contains, startsWith, endsWith :: string -> string -> bool
+{-
+Test if a string contains the given substring.
+```
+contains "mon" "monoid"   --> true
+startsWith "mon" "monoid" --> true
+endsWith "mon" "monoid"   --> false
+```
+-}
+
+val find :: string -> string -> list int
+let find sub str = def
+  let matches i = startsWith sub (dropLeft i str)
+  in List.filter matches $ List.range 0 (length str)
+{-
+Find every index where the given substring occurs.
+```
+find "al" "alphabetical" --> 0 : 10 :e
+```
+-}
+
+foreign replace :: string -> string -> string -> string
+{-
+Replace the given substring wherever it occurs.
+```
+replace "a" "z" "alphabetical" --> "zlphzbeticzl"
+```
+-}
+
+{- ## String conversions -}
+
+foreign toInt :: string -> maybe int
+{-
+Convert a string into an int.
+```
+toInt "lol" --> nothing
+toInt "16"  --> Just ^ 16
+```
+-}
+
+foreign fromInt :: int -> string
+{-
+Convert an int into a string.
+-}
+
+foreign toFloat :: string -> maybe float
+{-
+Convert a string into a float.
+```
+toFloat "html"  --> nothing
+toFloat "2.718" --> Just ^ 2.718
+```
+-}
+
+foreign fromFloat :: float -> string
+{-
+Convert a float into a string.
+-}
+
+foreign toList :: string -> list char
+{-
+Convert a string into a list of characters.
+-}
+
+foreign fromList :: list char -> string
+{-
+Convert a list of characters into a string.
+-}
+
+{- ## Listlike operations -}
+
+foreign cons :: char -> string -> string
+{-
+Build a string from a "head" and a "tail".
+```
+cons 'C' "omputer" --> "Computer"
+```
+-}
+
+foreign deconstruct :: any a. a -> (char -> string -> a) -> string -> a
+{-
+`deconstruct x f string` represents the following process:
+* If the string is empty, return `x`.
+* Otherwise, apply `f` to the head and tail of the string.
+-}
+
+foreign single :: char -> string
+{-
+Build a string from a single character.
+-}
+
+val head :: string -> maybe char
+let head = deconstruct nothing do c str. Just ^ c
+{-
+Get the first character of a string.
+```
+head ""       --> nothing
+head "invent" --> Just ^ 'i'
+```
+-}
+
+val tail :: string -> maybe string
+let tail = deconstruct nothing do c str. Just ^ str
+{-
+Remove the first character of a string.
+```
+tail ""       --> nothing
+tail "invent" --> Just ^ "nvent"
+```
+-}
+
+val get :: int -> string -> maybe char
+let get x =
+  deconstruct nothing do c str.
+    if (x < 0) { nothing }
+    $ else $ if (x == 0) { Just ^ c }
+    $ else $ get (x ~ 1) str
+{-
+Get the character at the given index. Return `nothing` if the index
+is out of range.
+```
+get 5 "hello" --> nothing
+get 3 "hello" --> Just ^ 'l'
+```
+-}
+
+val map :: (char -> char) -> string -> string
+let map f = deconstruct "" do c str. cons (f c) (map f str)
+{-
+Apply a function to each character in a string.
+-}
+
+val mapIndex :: (int -> char -> char) -> string -> string
+let mapIndex = mapIndexN 0
+{-
+Apply a function to each index-character pair in a string.
+-}
+
+val mapIndexN :: int -> (int -> char -> char) -> string -> string
+let mapIndexN x f =
+  deconstruct "" do c str.
+    cons (f x c) $ mapIndexN (x + 1) f str
+
+val filter :: (char -> bool) -> string -> string
+let filter f = def
+  let add c str = if (f c) { cons c str } { str }
+  in foldRight add ""
+{-
+Keep only the characters in a string that pass the given predicate.
+```
+filter Char.isUpper "John Quincy Adams" --> "JQA"
+```
+-}
+
+val partition
+  :: (char -> bool)
+  -> string
+  -> { Pass := string
+     ; Fail := string
+     ; nil }
+let partition f = def
+  let add c str = if (f c) { Pass #= cons c; str } { Fail #= cons c; str }
+  in foldRight add (Pass := ""; Fail := ""; unit)
+{-
+Partition the characters in a string based on whether they pass
+the given predicate.
+```
+partition Char.isUpper "LaTeX" --> Pass := "LTX"; Fail := "ae"; unit
+```
+-}
+
+val count :: (char -> bool) -> string -> int
+let count f = def
+  let add c x = if (f c) { x + 1 } { x }
+  in foldRight add 0
+{-
+Find the number of characters in a string that pass the given predicate.
+```
+count Char.isDigit "1-2-3-4" --> 4
+```
+-}
+
+val some :: (char -> bool) -> string -> bool
+let some f =
+  deconstruct false do c str.
+    if (f c) { true } { some f str }
+{-
+Test if at least one of the characters passes the given predicate.
+```
+some Char.isDigit ""    --> false
+some Char.isDigit "abc" --> false
+some Char.isDigit "gr8" --> true
+some Char.isDigit "123" --> true
+```
+-}
+
+val all :: (char -> bool) -> string -> bool
+let all f =
+  deconstruct true do c str.
+    if (not $ f c) { false } { all f str }
+{-
+Test if all of the characters pass the given predicate.
+```
+all Char.isDigit ""    --> true
+all Char.isDigit "abc" --> false
+all Char.isDigit "gr8" --> false
+all Char.isDigit "123" --> true
+```
+-}
+
+val foldLeft :: any a. (char -> a -> a) -> a -> string -> a
+let foldLeft f x =
+  deconstruct x do c str.
+    foldLeft f (f c x) str
+{-
+Fold a function over a string, starting with the first character.
+`foldLeft f x "gnu"` is eqivalent to `x # f 'g' # f 'n' # f 'u'`.
+-}
+
+val foldRight :: any a. (char -> a -> a) -> a -> string -> a
+let foldRight f x =
+  deconstruct x do c str.
+    f c (foldRight f x str)
+{-
+Fold a function over a string, starting with the last character.
+`foldRight f x "gnu"` is equivalent to `f 'g' $ f 'n' $ f 'u' $ x`
+-}

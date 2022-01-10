@@ -1,0 +1,62 @@
+export
+  type result, type maybe,
+  nothing, default,
+  map, apply, bind,
+  map2, map3, map4,
+  sequence, sequenceMap
+
+import Prelude open
+import List exposing type list
+import Variant
+
+type result e a = [Error := e; Just := a; nil]
+
+type maybe a = result unit a
+
+val nothing :: any a. maybe a
+let nothing = only Error
+
+val default :: any e a. a -> result e a -> a
+let default x = match Just identity $ else x
+
+val map :: any e a b. (a -> b) -> result e a -> result e b
+let map = Variant.map Just
+
+val apply :: any e a b. result e (a -> b) -> result e a -> result e b
+let apply = Variant.apply Just
+
+val bind :: any e a b. (a -> result e b) -> result e a -> result e b
+let bind = Variant.bind Just
+
+val map2
+  :: any e a1 a2 a3
+   . (a1 -> a2 -> a3)
+  -> result e a1
+  -> result e a2
+  -> result e a3
+let map2 = Variant.map2 Just
+
+val map3
+  :: any e a1 a2 a3 a4
+   . (a1 -> a2 -> a3 -> a4)
+  -> result e a1
+  -> result e a2
+  -> result e a3
+  -> result e a4
+let map3 = Variant.map3 Just
+
+val map4
+  :: any e a1 a2 a3 a4 a5
+   . (a1 -> a2 -> a3 -> a4 -> a5)
+  -> result e a1
+  -> result e a2
+  -> result e a3
+  -> result e a4
+  -> result e a5
+let map4 = Variant.map4 Just
+
+val sequence :: any e a. list (result e a) -> result e (list a)
+let sequence = Variant.sequence Just
+
+val sequenceMap :: any e a b. (a -> result e b) -> list a -> result e (list b)
+let sequenceMap = Variant.sequenceMap Just

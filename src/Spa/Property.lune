@@ -1,0 +1,95 @@
+export
+  type property, getProperty,
+  style, attribute, concat, listener,
+  onClick, onDoubleClick, onMouseDown, onMouseUp,
+  onMouseEnter, onMouseLeave, onMouseOver, onMouseOut,
+  onInput, onCheck, onSubmit,
+  onFocus, onBlur,
+  onKeyDown, onKeyUp
+
+import Prelude open
+import String exposing type string
+import List exposing type list, (:), empty
+import Program exposing type program
+
+import Spa_Event as Event exposing type event
+
+type property :: Type -> Type
+  where property st =
+    [ Style := { Name := string; Value := string; nil }
+    ; Attribute := { Name := string; Value := string; nil }
+    ; Multiple := list (property st)
+    ; Listener := { Event := string; Callback := event -> program st unit; nil }
+    ; nil ]
+  with makeProperty, getProperty
+
+val style :: any st. string -> string -> property st
+let style name value =
+  makeProperty $ Style ^
+    (Name := name; Value := value; unit)
+
+val attribute :: any st. string -> string -> property st
+let attribute name value =
+  makeProperty $ Attribute ^
+    (Name := name; Value := value; unit)
+
+val concat :: any st. list (property st) -> property st
+let concat = makeProperty << (Multiple ^)
+
+val listener :: any st. string -> (event -> program st unit) -> property st
+let listener event callback =
+  makeProperty $ Listener ^
+    (Event := event; Callback := callback; unit)
+
+val onClick, onDoubleClick :: any st. program st unit -> property st
+let onClick = listener "onclick" << const
+let onDoubleClick = listener "ondblclick" << const
+
+val onMouseDown, onMouseUp :: any st. program st unit -> property st
+let onMouseDown = listener "onmousedown" << const
+let onMouseUp = listener "onmousedown" << const
+
+val onMouseEnter, onMouseLeave :: any st. program st unit -> property st
+let onMouseEnter = listener "onmouseenter" << const
+let onMouseLeave = listener "onmouseleave" << const
+
+val onMouseOver, onMouseOut :: any st. program st unit -> property st
+let onMouseOver = listener "onmouseover" << const
+let onMouseOut = listener "onmouseout" << const
+
+val onInput :: any st. (string -> program st unit) -> property st
+let onInput callback =
+  listener "oninput" do event.
+    Event.stringField ("target" : "value" : empty) event
+    # match Just (do input. Event.stopPropagation event
+        # Program.then (callback input))
+    $ else Program.none
+
+val onCheck :: any st. (bool -> program st unit) -> property st
+let onCheck callback =
+  listener "onchange" do event.
+    Event.boolField ("target" : "checked" : empty) event
+    # match Just callback
+    $ else Program.none
+
+val onSubmit :: any st. program st unit -> property st
+let onSubmit callback =
+  listener "onsubmit" do event.
+  Event.stopPropagation event # Program.then callback
+
+val onFocus, onBlur :: any st. program st unit -> property st
+let onFocus = listener "onfocus" << const
+let onBlur = listener "onblur" << const
+
+val onKeyDown, onKeyUp :: any st. (string -> program st unit) -> property st
+let onKeyDown callback =
+  listener "onkeydown" do event.
+    Event.stringField ("key" : empty) event
+    # match Just callback
+    $ else Program.none
+
+let onKeyUp callback =
+  listener "onkeyup" do event.
+    Event.stringField ("key" : empty) event
+    # match Just callback
+    $ else Program.none

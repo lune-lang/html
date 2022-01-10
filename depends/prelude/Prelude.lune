@@ -1,0 +1,634 @@
+export
+  type (->), identity, const,
+  ($), (#), (<<), (>>),
+  type i, type f, type num, type int, type float,
+  float, round, floor, ceil, trunc,
+  (+), (~), (*), negate, abs, signum, constrain,
+  div, quot, mod, rem, (/),
+  type nil, type (:=), type (|), type (;),
+  type record, type variant, type label, type unit,
+  unit, (?), delete, (:=), (!=), (#=), (;),
+  (^), embed, match, else, absurd, only,
+  type delay, force, general,
+  type (&), (&),
+  type bool, true, false, not, (&&), (||), if,
+  (==), (/=), (<), (<=), (>), (>=),
+  isFinite, isInfinite, isNaN,
+  min, max, type order, compare
+
+infix ; right 10
+infix | right 10
+
+infix := non 15
+infix != non 15
+infix #= non 15
+
+infix # left 25
+
+infix $ right 30
+
+infix -> right 35
+
+infix & right 40
+
+infix || right 45
+
+infix && right 50
+
+infix == non 55
+infix /= non 55
+infix < non 55
+infix <= non 55
+infix > non 55
+infix >= non 55
+
+infix + left 65
+infix ~ left 65
+
+infix * left 70
+infix / left 70
+
+infix ? right 75
+infix ^ right 75
+
+infix << right 80
+infix >> left 80
+
+{- ## Functions -}
+
+type (->) :: Type -> Type -> Type
+syntax (->) function-type
+{-
+The type of functions. For example, a function that takes an integer and
+returns a string would have the type `int -> string`.
+-}
+
+val identity :: any a. a -> a
+let identity x = x
+{-
+A function that does nothing. `identity x` is equivalent to `x`.
+-}
+
+val const :: any a b. a -> b -> a
+let const x y = x
+{-
+`const x` is a function that ignores its argument and returns `x`.
+You can also use the notation `{ x }`.
+-}
+
+expand ($) f x = f x
+{-
+Apply the function on the left to the value on the right.
+The `$` operator has a relatively low precedence,
+so it is useful for avoiding parentheses. For example `f (g (h x))`
+can be written `f $ g $ h x`.
+-}
+
+expand (#) x f = f x
+{-
+Apply the function on the right to the value on the left.
+For example, `f (g (h x)) can be written h x # g # f`.
+-}
+
+val (<<) :: any a b c. (b -> c) -> (a -> b) -> (a -> c)
+let (<<) f g x = f (g x)
+{-
+Right-to-left function composition. `f << g` performs `g` and then `f`.
+-}
+
+val (>>) :: any a b c. (a -> b) -> (b -> c) -> (a -> c)
+let (>>) g f x = f (g x)
+{-
+Left-to-right function composition. `f >> g` performs `f` and then `g`.
+-}
+
+{- ## Numeric types and conversions -}
+
+type i :: Num
+type f :: Num
+type num :: Num -> Type
+syntax num number-type
+{-
+The type-level values `i` and `f` are of a different _kind_ than normal types.
+You can convert them into types with the constructor `num`; `num i` is
+the type of integers and `num f` is the type of floats. You
+can define functions that work on both integers and floats by writing
+`any x. num x`.
+-}
+
+type int = num i
+{-
+The type of integers. Lune compiles to Javascript, so integers and floats
+have the same representation at runtime. Nevertheless, the Lune type system
+distinguishes the two, because there are some computations (such as [`mod`](#mod))
+that only make sense with integers.
+-}
+
+type float = num f
+syntax float float-type
+{-
+The type of floating-point numbers.
+-}
+
+foreign float :: int -> float
+{-
+Convert an integer into a float. Lune does not perform such coercions implicitly.
+-}
+
+foreign round :: float -> int
+{-
+Round a number to the nearest integer.
+-}
+
+foreign floor :: float -> int
+{-
+Round a number down.
+```
+floor 1.5  --> 1
+floor -1.5 --> -2
+```
+-}
+
+foreign ceil :: float -> int
+{-
+Round a number up.
+```
+ceil 1.5  --> 2
+ceil -1.5 --> -1
+```
+-}
+
+val trunc :: float -> int
+let trunc x = if (x < 0) { ceil x } { floor x }
+{-
+If the input is less than zero, round up; otherwise, round down.
+In other words, get rid of everything after the decimal point.
+```
+trunc 1.5  --> 1
+trunc -1.5 --> -1
+```
+-}
+
+{- ## Mathematical operations -}
+
+foreign (+), (~), (*) :: any x. num x -> num x -> num x
+{-
+Addition, subtraction, and multiplication.
+
+Why is subtraction denoted with `~`?
+Well, consider the following expressions:
+```
+x -y
+(-z)
+```
+Should `x -y` be interpreted as subtraction? Or is it applying a function to a
+negative number? And is `(-z)` a negation or an operator section? I have
+decided to avoid these ambiguities by denoting subtraction with `~` and
+negation with `-`.
+-}
+
+foreign negate :: any x. num x -> num x
+syntax negate negate-function
+{-
+Negate a number. `-x` is syntactic sugar for `Prelude.negate x`.
+-}
+
+foreign abs :: any x. num x -> num x
+{-
+Take the absolute value of a number.
+-}
+
+foreign signum :: any x. num x -> num x
+{-
+Find the "sign" of a number. For positive numbers, `signum` returns 1,
+for negative numbers, it returns -1, and for 0, it returns 0. Note that
+`abs x * signum x` is always equal to `x`.
+-}
+
+val constrain :: any x. num x -> num x -> num x -> num x
+let constrain x y z =
+  if (z <= x) { x }
+  $ else $ if (z >= y) { y }
+  $ else $ z
+{-
+Constrain a number between a lower bound (the first argument) and an
+upper bound (the second argument).
+```
+constrain 0 10 11 --> 10
+constrain 0 10 -2 --> 0
+constrain 0 10 6  --> 6
+```
+-}
+
+foreign div, quot :: int -> int -> int
+{-
+Integer division. `div` rounds the result down, and `quot` truncates it.
+For positive arguments, these are the same thing.
+
+_Haskellers beware:_ the arguments to `div` and `quot` are the opposite
+of the Haskell definitions. `div 2` is a function that divides a number by 2,
+so `div 2 10` is equal to 5.
+-}
+
+foreign mod, rem :: int -> int -> int
+{-
+Integer modulo. `mod` represents actual modulo, and `rem` is the
+so-called "modulo" operation written with a `%` in most languages.
+The difference only matters with negative arguments: `mod 3 -1` evaluates to
+2, but `rem 3 -1` evaluates to -1.
+
+_Haskellers beware:_ the arguments to `mod` and `rem` are the opposite
+of the Haskell definitions. `mod 2` is a function that mods a number by 2,
+so `mod 2 10` is equal to 0.
+-}
+
+foreign (/) :: float -> float -> float
+{-
+Floating-point division.
+-}
+
+{- ## Rows -}
+
+{-
+A row is an unordered collection of types with labels attached to them.
+Rows are of the kind `Row`. They can be converted into normal types in two ways:
+* Surrounding a row in curly brackets creates a _record_ type,
+also known as a labeled product type. If you have a value with more than
+one property, use records.
+* Surrounding a row in square brackets creates a _variant_ type,
+also known as a labeled sum type. If you have a value that can exist in
+more than one state, use variants.
+
+Lune's row system is based on the following two papers by Daan Leijen:
+* [Extensible records with scoped labels](https://www.microsoft.com/en-us/research/publication/extensible-records-with-scoped-labels/)
+* [First-class labels for extensible rows](https://www.microsoft.com/en-us/research/publication/first-class-labels-for-extensible-rows/)
+-}
+
+type nil :: Row
+{-
+The empty row.
+-}
+
+type (:=) :: Label -> Type -> Row -> Row
+syntax (:=) row-constructor
+{-
+Add a label and a type to a row. The `:=` operator is usually
+used in conjunction with [`;`](#type-(;)). For example, to add the label `X`
+along with the type `float` to the row `r`, you can write `X := float; r`.
+-}
+
+type (|) s = s := unit
+{-
+Add a label to a row, along with the unit type. This is useful in variants
+where one of the states has no associated data.
+-}
+
+type (;) f x = f x
+{-
+Apply a type constructor to an argument.
+-}
+
+type record :: Row -> Type
+syntax record curly-brackets
+{-
+Convert an abstract row into a record type. `{r}` is
+syntactic sugar for `Prelude.record r`.
+-}
+
+type variant :: Row -> Type
+syntax variant square-brackets
+{-
+Convert an abstract row into a variant type. `[r]` is
+syntactic sugar for `Prelude.variant r`.
+-}
+
+type label :: Label -> Type
+syntax label label-type
+{-
+In Lune, labels are first-class values. The expression-level label
+`X` has the type `label X`.
+-}
+
+type unit = {nil}
+{-
+The unit type. The only value of type `unit` is the empty record, also
+denoted `unit`.
+-}
+
+{- ## Records -}
+
+foreign unit :: unit
+{-
+The empty record.
+-}
+
+foreign (?) :: any s a r. label s -> {s := a; r} -> a
+{-
+Extract a value from a record.
+```
+let person = Name := "Owen"; Age := 16; unit
+Name ? person --> "Owen"
+Age ? person  --> 16
+```
+-}
+
+foreign delete :: any s a r. label s -> {s := a; r} -> {r}
+{-
+Delete a label and its associated value from a record.
+```
+let person = Name := "Owen"; Age := 16; unit
+delete Age person --> Name := "Owen"; unit
+```
+-}
+
+foreign (:=) :: any s a r. label s -> a -> {r} -> {s := a; r}
+{-
+Add a label and a value to a record. The `:=` operator is usually
+used in conjunction with [`;`](#(;)). For example, to add the label `X`
+along with the value `5` to the record `r`, you can write `X := 5; r`.
+-}
+
+val (!=) :: any s a b r. label s -> b -> {s := a; r} -> {s := b; r}
+let (!=) s x r = s := x; delete s r
+{-
+Replace a value in a record.
+```
+let person = Name := "Owen"; Age := 16; unit
+Name != "Jack"; person --> Name := "Jack"; Age := 16; unit
+```
+-}
+
+val (#=) :: any s a b r. label s -> (a -> b) -> {s := a; r} -> {s := b; r}
+let (#=) s f r = s != f (s ? r); r
+{-
+Update a value in a record by applying the given function to it.
+```
+let person = Name := "Owen"; Age := 16; unit
+Age #= (+1); person --> Name := "Owen"; Age := 17; unit
+```
+-}
+
+val (;) :: any a b. (a -> b) -> a -> b
+let (;) f x = f x
+{-
+Apply the function on the left to the value on the right. The `;` operator
+is similar to [`$`](#($)), but has an even lower precedence and is typically
+used in records.
+-}
+
+{- ## Variants -}
+
+foreign (^) :: any s a r. label s -> a -> [s := a; r]
+{-
+Attach a label to a value. The `^` operator is polymorphic in its return
+type, so `X ^ 3.5` could have any of the following types:
+```
+[ X := float; nil ]
+[ X := float; Y := float; nil ]
+[ X := float; Foo := list string; Qwerty := unit; nil ]
+...
+```
+-}
+
+foreign embed :: any s a r. label s -> [r] -> [s := a; r]
+{-
+Suppose we have a value `v` that's annotated as a [`bool`](#type-bool),
+represented in Lune as `[ True | False | nil ]`. Now suppose we need to convert `v`
+into a value of the type `[ True | False | Maybe | nil ]`
+We aren't actually changing the value; we're just "adding a possibility."
+In Lune, this is written as `embed Maybe v`.
+-}
+
+foreign match :: any s a b r. label s -> (a -> b) -> ([r] -> b) -> [s := a; r] -> b
+{-
+Match a variant against a label and apply the appropriate function.
+`variant # match Label f g` represents the following process:
+* If `variant` is of the form `Label ^ value`, return `f value`.
+* Otherwise, return `g variant`.
+
+Matches can be chained. For example:
+```
+type color = [ Red | Green | Blue | nil ]
+val toInt :: color -> int
+let toInt =
+  match Red { 0 }
+  $ match Green { 1 }
+  { 2 }
+```
+-}
+
+val else :: any a b. a -> b -> a
+let else x y = x
+{-
+Using `else` can make matches more readable. The example above
+could also be written as:
+```
+let toInt =
+  match Red { 0 }
+  $ match Green { 1 }
+  $ else 2
+```
+-}
+
+val absurd :: any a. [nil] -> a
+let absurd = absurd
+{-
+Sometimes, you need test every possible label.
+In this case, [`match`](#match) requires you
+to give it a function of type `[nil] -> b`. This is where `absurd`
+comes in:
+```
+let toInt =
+  match Red { 0 }
+  $ match Green { 1 }
+  $ match Blue { 2 }
+  absurd
+```
+-}
+
+val only :: any s r. label s -> [s := unit; r]
+let only s = s ^ unit
+{-
+A label with no information attached to it.
+```
+val red :: color
+let red = only Red
+```
+-}
+
+{- ## Delayed computations -}
+
+type delay a = unit -> a
+{-
+A "delayed computation" is a function that takes no arguments. (More
+precisely, it takes a useless argument of type [`unit`](#type-unit).)
+-}
+
+val force :: any a. delay a -> a
+let force f = f unit
+{-
+Force a delayed computation.
+-}
+
+val general :: any a b. delay a -> b -> a
+let general f x = f unit
+{-
+Generalise a delayed computation, so you can apply it to any value
+instead of just [`unit`](#unit).
+-}
+
+{- ## Pairs -}
+
+type (&) a b = { First := a; Second := b; nil }
+{-
+Pairs (also known as tuples) are represented as
+records with a `First` field and a `Second` field.
+-}
+
+val (&) :: any a b. a -> b -> a & b
+let (&) x y = First := x; Second := y; unit
+{-
+Construct a pair from two values.
+-}
+
+{- ## Booleans -}
+
+type bool = [ True | False | nil ]
+{-
+Unlike most languages, Lune does not have built-in booleans.
+The `bool` type and all boolean operations can be defined
+with Lune's variant system.
+-}
+
+val true, false :: bool
+let true = only True
+let false = only False
+{-
+A boolean can be either `true` or `false`. These are defined as
+`only True` and `only False` respectively.
+-}
+
+val not :: bool -> bool
+let not = match True { false } { true }
+{-
+Boolean inversion. Truth is fantasy, and fantasy is truth.
+```
+not true  --> false
+not false --> true
+```
+-}
+
+val and, or :: bool -> delay bool -> bool
+let and x y = x # match True y { false }
+let or x y = x # match True { true } (general y)
+
+expand (&&) x y = and x { y }
+{-
+Test if both statements are true. The `&&` operator
+"short-circuits", so the second argument will not be evaluated
+if the first one is `false`.
+-}
+
+expand (||) x y = or x { y }
+{-
+Test if at least one of the statements is true. The `||` operator
+"short-circuits", so the second argument will not be evaluated if the
+first one is `true`.
+
+This short-circuiting behavior is not built in. There is nothing
+special about `&&` and `||`; they are defined using Lune's
+expression synonym feature.
+-}
+
+val if :: any a. bool -> delay a -> delay a -> a
+let if c x y = c # match True x (general y)
+{-
+`if condition x y` evaluates `x` if the condition
+is true, and `y` if it is false. For example,
+the [`trunc`](#trunc) function is defined as follows:
+```
+val trunc :: float -> float
+let trunc x = if (x < 0) { ceil x } { floor x }
+```
+which could also be written as:
+```
+let trunc x = if (x < 0) { ceil x } $ else (floor x)
+```
+-}
+
+{- ## Comparisons and predicates -}
+
+foreign (==) :: any a. a -> a -> bool
+{-
+Test if two values are equal. The `==` operator checks for _actual_
+equality, not referential equality.
+-}
+
+val (/=) :: any a. a -> a -> bool
+let (/=) x y = not (x == y)
+{-
+Test if two values are not equal.
+-}
+
+foreign (<), (>) :: any a. a -> a -> bool
+{-
+Test if one value is less than the other. Record fields and variant
+labels are compared in alphabetical order.
+-}
+
+val (<=), (>=) :: any a. a -> a -> bool
+let (<=) x y = x < y || x == y
+let (>=) x y = x > y || x == y
+{-
+Test if one value is less than or equal to the other.
+-}
+
+foreign isFinite :: float -> bool
+{-
+Test if a floating-point number is finite.
+```
+isFinite 6        --> true
+isFinite (1 / 0)  --> false
+isFinite (0 / 0)  --> false
+```
+-}
+
+val isInfinite :: float -> bool
+let isInfinite x = not (isFinite x || isNaN x)
+{-
+Test if a floating-point number is infinite.
+```
+isInfinite 6       --> false
+isInfinite (1 / 0) --> true
+isInfinite (0 / 0) --> false
+```
+-}
+
+foreign isNaN :: float -> bool
+{-
+Test if a floating-point number is NaN.
+```
+isNaN 6       --> false
+isNaN (1 / 0) --> false
+isNaN (0 / 0) --> true
+```
+-}
+
+val min, max :: any a. a -> a -> a
+let min x y = if (x < y) { x } { y }
+let max x y = if (x > y) { x } { y }
+{-
+Find the minimum or maximum of two values.
+-}
+
+type order = [ Less | Greater | Equal | nil ]
+
+val compare :: any a. a -> a -> order
+let compare x y =
+  if (x == y) { only Equal }
+  $ else $ if (x < y) { only Less }
+  $ else $ only Greater
+
+{-
+Compare two values and return an `order`.
+-}

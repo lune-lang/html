@@ -1,0 +1,52 @@
+export
+  map, apply, bind,
+  map2, map3, map4,
+  sequence, sequenceMap
+
+import Prelude open
+import List exposing type list, empty, (:)
+
+val map :: any s a b r. label s -> (a -> b) -> [s := a; r] -> [s := b; r]
+let map s f = match s (do x. s ^ f x) $ embed s
+
+val apply :: any s a b r. label s -> [s := (a -> b); r] -> [s := a; r] -> [s := b; r]
+let apply s vf vx = vf # match s (do f. map s f vx) $ embed s
+
+val bind :: any s a b r. label s -> (a -> [s := b; r]) -> [s := a; r] -> [s := b; r]
+let bind s f = match s f $ embed s
+
+val map2
+  :: any s a1 a2 a3 r
+   . label s
+  -> (a1 -> a2 -> a3)
+  -> [s := a1; r]
+  -> [s := a2; r]
+  -> [s := a3; r]
+let map2 s f v = apply s (map s f v)
+
+val map3
+  :: any s a1 a2 a3 a4 r
+   . label s
+  -> (a1 -> a2 -> a3 -> a4)
+  -> [s := a1; r]
+  -> [s := a2; r]
+  -> [s := a3; r]
+  -> [s := a4; r]
+let map3 s f v1 v2 = apply s (map2 s f v1 v2)
+
+val map4
+  :: any s a1 a2 a3 a4 a5 r
+   . label s
+  -> (a1 -> a2 -> a3 -> a4 -> a5)
+  -> [s := a1; r]
+  -> [s := a2; r]
+  -> [s := a3; r]
+  -> [s := a4; r]
+  -> [s := a5; r]
+let map4 s f v1 v2 v3 = apply s (map3 s f v1 v2 v3)
+
+val sequence :: any s a r. label s -> list [s := a; r] -> [s := list a; r]
+let sequence s = List.foldRight (map2 s (:)) (s ^ empty)
+
+val sequenceMap :: any s a b r. label s -> (a -> [s := b; r]) -> list a -> [s := list b; r]
+let sequenceMap s f xs = sequence s (List.map f xs)

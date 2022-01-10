@@ -1,0 +1,29 @@
+export
+  type event,
+  stopPropagation, preventDefault,
+  stringField, boolField, intField, floatField
+
+import Prelude open
+import String exposing type string
+import List exposing type list
+import Result exposing type maybe
+import IO exposing type io
+import Program exposing type program
+
+type event :: Type
+
+foreign stopPropagationIO, preventDefaultIO :: event -> io unit
+
+val stopPropagation :: any st. event -> program st unit
+let stopPropagation = Program.fromIO << stopPropagationIO
+
+val preventDefault :: any st. event -> program st unit
+let preventDefault = Program.fromIO << preventDefaultIO
+
+foreign stringField :: list string -> event -> maybe string
+
+foreign boolField :: list string -> event -> maybe bool
+
+foreign intField :: list string -> event -> maybe int
+
+foreign floatField :: list string -> event -> maybe float

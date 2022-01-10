@@ -1,0 +1,113 @@
+export
+  type program,
+  get, getBy, put, modify,
+  map, apply, bind, then,
+  run, fromIO, pure, none,
+  map2, map3, map4,
+  sequence, sequenceMap
+
+import Prelude open
+import List exposing type list, (:), empty
+import IO exposing type io
+
+type program st a = st -> io { Set := st; Return := a; nil }
+{-
+`program st a` is similar to [`io a`](IO.md), but has access
+to a state of type `st`.
+
+Note: this is not a general library for working with state.
+Do not use the `program` type for functions without side effects.
+-}
+
+{- ## State manipulation -}
+
+val get :: any st. program st st
+let get = getBy identity
+{-
+Get the current state.
+-}
+
+val getBy :: any st a. (st -> a) -> program st a
+let getBy f state = IO.pure (Set := state; Return := f state; unit)
+{-
+Get the current state and apply a function to it.
+For example, if the state is stored as record, and you want
+to retrieve only the `User` field, you can use `getBy (User ?)`.
+-}
+
+val put :: any st. st -> program st unit
+let put state = modify {state}
+{-
+Replace the current state with a new one.
+-}
+
+val modify :: any st. (st -> st) -> program st unit
+let modify f state = IO.pure (Set := f state; Return := unit; unit)
+{-
+Modify the state by applying a function to it.
+-}
+
+{- ## Mapping -}
+
+val map :: any st a b. (a -> b) -> program st a -> program st b
+let map f act state = IO.map (Return #= f) (act state)
+
+val apply :: any st a b. program st (a -> b) -> program st a -> program st b
+let apply act1 act2 state =
+  act1 state # IO.bind do result1.
+  act2 (Set ? result1) # IO.bind do result2.
+  IO.pure (Return != Return ? result1 $ Return ? result2; result2)
+
+val bind :: any st a b. (a -> program st b) -> program st a -> program st b
+let bind f act state =
+  act state # IO.bind do result.
+  f (Return ? result) (Set ? result)
+
+val then :: any st a. program st a -> program st unit -> program st a
+let then act2 act1 = act1 # bind { act2 }
+
+val run :: any st a. st -> program st a -> io a
+let run state act = IO.map (Return ?) (act state)
+
+val fromIO :: any st a. io a -> program st a
+let fromIO act state = act # IO.map do x.
+  Set := state; Return := x; unit
+
+val pure :: any st a. a -> program st a
+let pure = fromIO << IO.pure
+
+val none :: any st. program st unit
+let none = pure unit
+
+val map2
+  :: any st a1 a2 a3
+   . (a1 -> a2 -> a3)
+  -> program st a1
+  -> program st a2
+  -> program st a3
+let map2 f act = apply (map f act)
+
+val map3
+  :: any st a1 a2 a3 a4
+   . (a1 -> a2 -> a3 -> a4)
+  -> program st a1
+  -> program st a2
+  -> program st a3
+  -> program st a4
+let map3 f act1 act2 = apply (map2 f act1 act2)
+
+val map4
+  :: any st a1 a2 a3 a4 a5
+   . (a1 -> a2 -> a3 -> a4 -> a5)
+  -> program st a1
+  -> program st a2
+  -> program st a3
+  -> program st a4
+  -> program st a5
+let map4 f act1 act2 act3 = apply (map3 f act1 act2 act3)
+
+val sequence :: any st a. list (program st a) -> program st (list a)
+let sequence = List.foldRight (map2 (:)) (pure empty)
+
+val sequenceMap :: any st a b. (a -> program st b) -> list a -> program st (list b)
+let sequenceMap f xs = sequence (List.map f xs)

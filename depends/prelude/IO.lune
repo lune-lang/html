@@ -1,0 +1,127 @@
+export
+  type io,
+  map, apply, bind, then,
+  pure, none,
+  map2, map3, map4,
+  sequence, sequenceMap
+
+import Prelude open
+import String exposing type string
+import List exposing type list, empty, (:)
+
+type io :: Type -> Type
+{-
+For a program to be useful, it must have some kind of _output_:
+an image, a text file, a web application, etc. Most programs also
+take _input_ from the user. This is a problem for
+pure functional languages: how can you perform side effects
+(input and output) while preserving referential transparency?
+
+In Lune, any value that causes side effects is wrapped in the
+`io` functor; `io a` represents an action that returns `a`.
+-}
+
+{- ## Mapping -}
+
+{-
+There are three ways to convert an `io a` into an `io b`.
+* with a function of type `a -> b` ([`map`](#map))
+* with an action of type `io (a -> b)` ([`apply`](#apply))
+* with a function of type `a -> io b` ([`bind`](#bind))
+
+Of these, `bind` is the most general.
+-}
+
+foreign map :: any a b. (a -> b) -> io a -> io b
+{-
+`map f i` is an action that performs `i` and applies `f` to the result.
+-}
+
+foreign apply :: any a b. io (a -> b) -> io a -> io b
+{-
+`apply i j` is an action that
+1. performs `i` to get a function `f`
+2. performs `j` to get a value `x`
+3. returns `f x`
+-}
+
+foreign bind :: any a b. (a -> io b) -> io a -> io b
+{-
+`i # bind do x. j` is an action that performs `i`,
+names the result `x`, and then performs `j`.
+-}
+
+val then :: any a. io a -> io unit -> io a
+let then act2 act1 = act1 # bind { act2 }
+{-
+`i # then j` is an action that performs `i` and then performs `j`.
+-}
+
+{- ## Pure actions -}
+
+foreign pure :: any a. a -> io a
+{-
+Do nothing and return the given value.
+-}
+
+val none :: io unit
+let none = pure unit
+{-
+Do nothing and return `unit`.
+-}
+
+{- ## Multimapping -}
+
+val map2
+  :: any a1 a2 a3
+   . (a1 -> a2 -> a3)
+  -> io a1
+  -> io a2
+  -> io a3
+let map2 f act = apply (map f act)
+{-
+Map a binary function over two actions by applying it
+to the results.
+-}
+
+val map3
+  :: any a1 a2 a3 a4
+   . (a1 -> a2 -> a3 -> a4)
+  -> io a1
+  -> io a2
+  -> io a3
+  -> io a4
+let map3 f act1 act2 = apply (map2 f act1 act2)
+{-
+Map a three-argument function over three actions by applying it
+to the results.
+-}
+
+val map4
+  :: any a1 a2 a3 a4 a5
+   . (a1 -> a2 -> a3 -> a4 -> a5)
+  -> io a1
+  -> io a2
+  -> io a3
+  -> io a4
+  -> io a5
+let map4 f act1 act2 act3 = apply (map3 f act1 act2 act3)
+{-
+Map a four-argument function over four actions by applying it
+to the results.
+-}
+
+{- ## Sequencing actions -}
+
+val sequence :: any a. list (io a) -> io (list a)
+let sequence = List.foldRight (map2 (:)) (pure empty)
+{-
+Perform a list of actions and collect the results.
+-}
+
+val sequenceMap :: any a b. (a -> io b) -> list a -> io (list b)
+let sequenceMap f xs = sequence (List.map f xs)
+{-
+Map a function over a list, perform the resulting list of actions,
+and collect the results.
+-}

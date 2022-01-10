@@ -1,0 +1,42 @@
+export type element, none, text, node
+
+import Prelude open
+import String exposing type string
+import List exposing type list
+import Program exposing type program
+
+import Spa_Property as Property exposing type property
+import Spa_Event as Event exposing type event
+
+type element :: Type -> Type
+
+val none :: any st. element st
+let none = text ""
+
+foreign text :: any st. string -> element st
+
+foreign node
+  :: any st
+   . string
+  -> list (property st)
+  -> list (element st)
+  -> element st
+refers Spa_Element.addProperties
+
+foreign addStyle :: any a. string -> string -> a -> a
+
+foreign addAttribute :: any a. string -> string -> a -> a
+
+foreign addListener :: any a st. string -> (event -> program st unit) -> a -> a
+
+val addProperty :: any a st. property st -> a -> a
+let addProperty prop =
+  Property.getProperty prop
+  # match Style (do style. addStyle (Name ? style) (Value ? style))
+  $ match Attribute (do attr. addAttribute (Name ? attr) (Value ? attr))
+  $ match Multiple (List.map addProperty >> List.foldRight (>>) identity)
+  $ match Listener (do lis. addListener (Event ? lis) (Callback ? lis))
+  $ absurd
+
+val addProperties :: any a st. list (property st) -> a -> a
+let addProperties = List.map addProperty >> List.foldRight (>>) identity
